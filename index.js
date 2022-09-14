@@ -8,6 +8,7 @@ let allPlayers;
 let allPremTeams;
 let draftTeams = [];
 let fullDataArr = [];
+let draftOrder;
 
 
 // get league team data
@@ -29,17 +30,16 @@ const getElementTypes = () => {
 };
 
 // get the draft league team players
-const draftLeagueTeamPlayers = (teamId) => {
-    // hardcoded GW 6
-    axios.get("https://draft.premierleague.com/api/entry/"+ teamId +"/event/6")
+const draftLeagueTeamPlayers = (teamId, event) => {
+    axios.get("https://draft.premierleague.com/api/entry/"+ teamId +"/event/"+ event)
         .then((response) => {
-            draftTeams.push({id: teamId, picks: response.data.picks});
+            draftTeams.push({gameweek: "GW"+ event, id: teamId, picks: response.data.picks});
         })
 };
 
 
 // function to grab the team players from the entire player list
-const filterPlayers = (arr1, arr2, id, name) => {
+const filterPlayers = (arr1, arr2, id, name, GW) => {
     let teamStats = [];
     teamStats = arr1.filter((player) => {
         return arr2.find((element) => {
@@ -47,28 +47,29 @@ const filterPlayers = (arr1, arr2, id, name) => {
         });
     });
     //return teamStats;
-    createObject(teamStats,id,name);
+    createObject(teamStats,id,name,GW);
 };
 
-const createObject = (team,id,name) => {
+const createObject = (team,id,name,GW) => {
     //fullDataArr.push({id: team.id, fullTeam:[]});
     for (var i = 0; i < team.length; i++) {
         let proTeam = allPremTeams.find(premTeam => premTeam.id == team[i].team);
         let premTeam = proTeam.name;
-        fullDataArr.push({teamName: name, playerId: id, name: team[i].web_name, premTeam: premTeam, points: team[i].total_points, minutes: team[i].minutes, ppg: team[i].points_per_game, form: team[i].form});
+        fullDataArr.push({teamName: name, playerId: id, gameweek: GW, name: team[i].web_name, premTeam: premTeam, points: team[i].total_points, minutes: team[i].minutes, ppg: team[i].points_per_game, form: team[i].form});
     }
 
-    if (fullDataArr.length == 150) {
+    if (fullDataArr.length == 1050) {
         writeResults(fullDataArr);
     }
 };
 
 const writeResults = async (stats) => {
     const csvWriter = createCsvWriter({
-        path: "FPLstats2.csv",
+        path: "FPLstats4.csv",
         header: [
             {id: "teamName", title: "Team Name" },
             {id: "playerId", title: "Team ID"},
+            {id: "gameweek", title: "Gameweek"},
             {id: "name", title: "Player Names"},
             {id: "premTeam", title: "Premier Team"},
             {id: "points", title: "Total Points"},
@@ -85,19 +86,71 @@ const writeResults = async (stats) => {
 
 };
 
+// get official league draft list of players selected
+const getDraftOrder = () => {
+    axios.get("https://draft.premierleague.com/api/draft/18161/choices")
+        .then((response) => {
+            draftOrder = response.data.choices;
+        })
+};
+
+const writeDraftData = (data) => {
+    const csvWriter = createCsvWriter({
+        path: "draftStats.csv",
+        header: [
+            {id: "round", title: "Round" },
+            {id: "pick", title: "Pick" },
+            {id: "leaguePlayer", title: "Picked By" },
+            {id: "player", title: "Prem Player" },
+            {id: "points", title: "Total Points" },
+            {id: "draftRank", title: "Draft Rank" },
+            {id: "diff", title: "Expected Ranking Score"}
+        ]
+    });
+
+    csvWriter.writeRecords(data)
+        .then(() => {
+            console.log("DONE!");
+        });
+};
+
 getLeagueTeams();
 getElementTypes();
+getDraftOrder();
 
-setTimeout(() => {
-    for (var i = 0; i < leagueTeams.length; i++) {
-        draftLeagueTeamPlayers(leagueTeams[i].entry_id);
-    }
-}, 3000);
+// setTimeout(() => {
+//     for (var i = 0; i < leagueTeams.length; i++) {
+//         for (var eventId = 1; eventId < 8; eventId++) {
+//             draftLeagueTeamPlayers(leagueTeams[i].entry_id, eventId);
+//         }
+//     }
+// }, 3000);
 
+// setTimeout(() => {
+//     for (var y = 0; y < draftTeams.length; y++) {
+//         let teamInfo = leagueTeams.find(team => team.entry_id == draftTeams[y].id);
+//         let nameAndTeam = teamInfo.player_first_name + " " + teamInfo.player_last_name + " - " + teamInfo.entry_name;
+//         filterPlayers(allPlayers, draftTeams[y].picks, teamInfo.entry_id, nameAndTeam, draftTeams[y].gameweek);
+//     }
+// }, 5000);
+
+// kickoff the draft stat document creation
 setTimeout(() => {
-    for (var y = 0; y < draftTeams.length; y++) {
-        let teamInfo = leagueTeams.find(team => team.entry_id == draftTeams[y].id);
-        let nameAndTeam = teamInfo.player_first_name + " " + teamInfo.player_last_name + " - " + teamInfo.entry_name;
-        filterPlayers(allPlayers, draftTeams[y].picks, teamInfo.entry_id, nameAndTeam);
-    }
-}, 5000);
+    let draftStats = [];
+    let playersFiltered = [];
+     for (var y = 0; y < draftOrder.length; y++) {
+        playersFiltered.push(allPlayers.find(player => player.id == draftOrder[y].element));
+     }
+     for (var i = 0; i < draftOrder.length; i++) {
+        draftStats.push({round: draftOrder[i].round, pick: draftOrder[i].pick, leaguePlayer: draftOrder[i].player_first_name + " "+ draftOrder[i].player_last_name, player: playersFiltered[i].web_name, points: playersFiltered[i].total_points, draftRank: playersFiltered[i].draft_rank});
+     }
+     draftStats.sort((a,b) => {
+        return b.points - a.points;
+     });
+
+     for (var x = 0; x < draftStats.length; x++) {
+        draftStats[x].diff = draftStats[x].draftRank - (x+1);
+     }
+
+     writeDraftData(draftStats);
+}, 2000)

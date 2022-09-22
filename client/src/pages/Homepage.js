@@ -16,7 +16,8 @@ const Homepage = () => {
             }
         })
         .then((response) => {
-            setElementData(response.json());
+            //setElementData(response.json());
+            console.log(response.json());
         })
     }
 

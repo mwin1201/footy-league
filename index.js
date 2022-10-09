@@ -41,31 +41,39 @@ const draftLeagueTeamPlayers = (teamId, event) => {
 // function to grab the team players from the entire player list
 const filterPlayers = (arr1, arr2, id, name, GW) => {
     let teamStats = [];
+    let teamPoints = 0;
     teamStats = arr1.filter((player) => {
         return arr2.find((element) => {
             return player.id == element.element;
         });
     });
     //return teamStats;
-    createObject(teamStats,id,name,GW);
+    teamStats.sort((a,b) => {
+        return b.total_points - a.total_points;
+     });
+     for (var i = 0; i < teamStats.length; i++) {
+        teamPoints = teamPoints + teamStats[i].total_points;
+     }
+    createObject(teamStats,id,name,GW,teamPoints);
 };
 
-const createObject = (team,id,name,GW) => {
+const createObject = (team,id,name,GW,teamPoints) => {
     //fullDataArr.push({id: team.id, fullTeam:[]});
     for (var i = 0; i < team.length; i++) {
         let proTeam = allPremTeams.find(premTeam => premTeam.id == team[i].team);
         let premTeam = proTeam.name;
-        fullDataArr.push({teamName: name, playerId: id, gameweek: GW, name: team[i].web_name, premTeam: premTeam, points: team[i].total_points, minutes: team[i].minutes, ppg: team[i].points_per_game, form: team[i].form});
+        fullDataArr.push({teamName: name, playerId: id, gameweek: GW, name: team[i].web_name, premTeam: premTeam, points: team[i].total_points, minutes: team[i].minutes, ppg: team[i].points_per_game, form: team[i].form, teamPoints: teamPoints});
     }
 
-    if (fullDataArr.length == 1050) {
+    // 15 players for 10 teams in league for 1 gameweek is how we get 150
+    if (fullDataArr.length == 150) {
         writeResults(fullDataArr);
     }
 };
 
 const writeResults = async (stats) => {
     const csvWriter = createCsvWriter({
-        path: "FPLstats4.csv",
+        path: "FPLstatsGW9.csv",
         header: [
             {id: "teamName", title: "Team Name" },
             {id: "playerId", title: "Team ID"},
@@ -75,7 +83,8 @@ const writeResults = async (stats) => {
             {id: "points", title: "Total Points"},
             {id: "minutes", title: "Total Minutes Played"},
             {id: "ppg", title: "Points per Game"},
-            {id: "form", title: "Form"}
+            {id: "form", title: "Form"},
+            {id: "teamPoints", title: "Total Team Points"}
         ]
     });
 
@@ -96,7 +105,7 @@ const getDraftOrder = () => {
 
 const writeDraftData = (data) => {
     const csvWriter = createCsvWriter({
-        path: "draftStats.csv",
+        path: "draftStats_thruGW9.csv",
         header: [
             {id: "round", title: "Round" },
             {id: "pick", title: "Pick" },
@@ -118,21 +127,22 @@ getLeagueTeams();
 getElementTypes();
 getDraftOrder();
 
-// setTimeout(() => {
-//     for (var i = 0; i < leagueTeams.length; i++) {
-//         for (var eventId = 1; eventId < 8; eventId++) {
-//             draftLeagueTeamPlayers(leagueTeams[i].entry_id, eventId);
-//         }
-//     }
-// }, 3000);
+setTimeout(() => {
+    for (var i = 0; i < leagueTeams.length; i++) {
+        // for (var eventId = 1; eventId < 8; eventId++) {
+        //     draftLeagueTeamPlayers(leagueTeams[i].entry_id, eventId);
+        // }
+        draftLeagueTeamPlayers(leagueTeams[i].entry_id, 9);
+    }
+}, 3000);
 
-// setTimeout(() => {
-//     for (var y = 0; y < draftTeams.length; y++) {
-//         let teamInfo = leagueTeams.find(team => team.entry_id == draftTeams[y].id);
-//         let nameAndTeam = teamInfo.player_first_name + " " + teamInfo.player_last_name + " - " + teamInfo.entry_name;
-//         filterPlayers(allPlayers, draftTeams[y].picks, teamInfo.entry_id, nameAndTeam, draftTeams[y].gameweek);
-//     }
-// }, 5000);
+setTimeout(() => {
+    for (var y = 0; y < draftTeams.length; y++) {
+        let teamInfo = leagueTeams.find(team => team.entry_id == draftTeams[y].id);
+        let nameAndTeam = teamInfo.player_first_name + " " + teamInfo.player_last_name + " - " + teamInfo.entry_name;
+        filterPlayers(allPlayers, draftTeams[y].picks, teamInfo.entry_id, nameAndTeam, draftTeams[y].gameweek);
+    }
+}, 5000);
 
 // kickoff the draft stat document creation
 setTimeout(() => {
@@ -153,4 +163,4 @@ setTimeout(() => {
      }
 
      writeDraftData(draftStats);
-}, 2000)
+}, 10000)
